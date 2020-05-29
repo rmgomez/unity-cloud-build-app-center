@@ -99,9 +99,9 @@ app.post('/build', jsonParser, async function (req, res) {
         });
     }
 
-    if (req.query.includeTargets) {
-        var includeTargets = req.query.includeTargets.split(',').map(x => x.trim());
-        if (!includeTargets.includes(req.body.buildTargetName)) {
+    if (req.query.excludeTargets) {
+        var excludedTargets = req.query.excludeTargets.split(',').map((x) => x.trim());
+        if (excludedTargets.includes(req.body.buildTargetName)) {
             logger.info('Target "%s" excluded, skipping', req.body.buildTargetName);
             return;
         }
