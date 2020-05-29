@@ -107,6 +107,14 @@ app.post('/build', jsonParser, async function (req, res) {
         }
     }
 
+    if (req.query.includeTargets) {
+        var includedTargets = req.query.includeTargets.split(',').map((x) => x.trim());
+        if (!includedTargets.includes(req.body.buildTargetName)) {
+            logger.info('Target "%s" not included, skipping', req.body.buildTargetName);
+            return;
+        }
+    }
+
     var { url, filename, notes } = await getBuildDetails(buildAPIURL);
     var downloadedFilename = await downloadBinary(url, filename);
     await uploadToAppCenter(downloadedFilename, notes, req.body.platform, req.query.ownerName, req.query.appName, req.query.team);
@@ -238,7 +246,7 @@ function commitAppCenterUpload (ownerName, appName, uploadId) {
         najax({
             url: url,
             type: 'PATCH',
-            content_type: 'application/json',
+            contentType: 'application/json',
             data: { status: 'committed' },
             headers: {
                 'X-API-Token': options.appCenterAPIKey
@@ -270,7 +278,7 @@ function distributeAppCenterUpload (releaseUrl, team, notes) {
         najax({
             url: url,
             type: 'PATCH',
-            content_type: 'application/json',
+            contentType: 'application/json',
             data: data,
             headers: {
                 'X-API-Token': options.appCenterAPIKey
@@ -305,7 +313,7 @@ function uploadFileToAppCenter (filename, uploadUrl) {
     return new Promise((resolve, reject) => {
         var req = form.submit({
             host: parsedUrl.host,
-            path: parsedUrl.pathname + parsedUrl.search,
+            path: parsedUrl.pathname + (parsedUrl.search ? parsedUrl.search : ''),
             protocol: parsedUrl.protocol,
             headers: {
                 'Accept': 'application/json',
