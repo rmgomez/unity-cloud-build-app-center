@@ -202,8 +202,8 @@ async function uploadToAppCenter (filename, notes, platform, ownerName, appName,
 }
 
 function createAppCenterUpload (ownerName, appName) {
-    logger.info('createAppCenterUpload: start');
     var url = `${options.appCenterHost}/v0.1/apps/${ownerName}/${appName}/release_uploads`;
+    logger.info(`createAppCenterUpload: start post to: ${url} with apikey: ${options.appCenterAPIKey}`);
 
     return new Promise((resolve, reject) =>
         najax({
