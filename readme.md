@@ -20,7 +20,7 @@ A NodeJS application to automate binary deployments from Unity Cloud Build to Ap
   - `UNITYCLOUD_SECRET` - shared secret used by Unity Cloud Build to sign the request when sending webhook.
   This signature need to be valid, otherwise the request will be ignored
   If this variable is not provided, signature check will be disabled (ie. all requests will be accepted).
-  - `APPCENTER_KEY` - App Center API key
+  - `APPCENTER_KEY` - App Center API key (the your user API Key)
 
 ## URL configuration
 
@@ -43,7 +43,13 @@ required configuration in the URL query string.
      * App Center API key can be created [here](https://appcenter.ms/settings/apitokens).
   3. Deploy the Docker image.  
   4. Setup the Unity Cloud Build webhook.
-     * Within UCB, view your app. Click 'Notifications', then 'Add New' and enter your app URL with '/build' appended. E.g. 'https://[appurl]/build/'
+
+## Unity Cloud Build Webhook
+  1. Within UCB, view your app. 
+  2. Click 'Integrations'.
+  3. 'Add New' and enter your app URL with '/build' appended. E.g. 'https://[appurl]/build?ownerName=rmgomez&appName=Test-UCB-iOS&includeTargets=Dev%20iOS'
+  4. Create and set a new Authorization Secret (this will be your `UNITYCLOUD_SECRET` env var)
+  5. Set the Authorization Type as HMAC-SHA256 Signature
 
 ## Troubleshooting
 
