@@ -6,6 +6,8 @@ var options = {
     unityCloudSecret: process.env.UNITYCLOUD_SECRET,
     appCenterHost: 'https://api.appcenter.ms',
     appCenterAPIKey: process.env.APPCENTER_KEY,
+    diawiHost: 'https://upload.diawi.com',
+    diawiAPIKey: process.env.DIAWI_KEY,
     logLevel: process.env.LOG_LEVEL || 'info'
 };
 
@@ -109,7 +111,13 @@ app.post('/build', jsonParser, async function (req, res) {
 
     var { url, filename, notes } = await getBuildDetails(buildAPIURL);
     var downloadedFilename = await downloadBinary(url, filename);
-    await uploadToAppCenter(downloadedFilename, notes, req.body.platform, req.query.ownerName, req.query.appName, req.query.team);
+    if (req.query.destiny === 'Diawi'){
+        await upLoadToDiawi(downloadedFilename, notes, req.body.platform);
+    }
+    else{
+        await uploadToAppCenter(downloadedFilename, notes, req.body.platform, req.query.ownerName, req.query.appName, req.query.team);
+    }
+
 });
 
 function getBuildDetails (buildAPIURL) {
@@ -201,6 +209,115 @@ async function uploadToAppCenter (filename, notes, platform, ownerName, appName,
     }
 }
 
+async function uploadToDiawi(filename, notes, platform){
+    if (platform === 'android' || platform === 'ios') {
+        var { uploadId, uploadUrl } = await createDiawiUpload(ownerName, appName);
+        await uploadFileToDiawi(filename);
+        var releaseUrl = await commitAppCenterUpload(ownerName, appName, uploadId);
+        await distributeAppCenterUpload(releaseUrl, team, notes);
+    } else {
+        logger.error('Platform not supported: %s', platform);
+    }
+}
+
+function createDiawiUpload(ownername, appName){
+  var url = `${options.diawiHost}/v0.1/apps/${ownerName}/${appName}/release_uploads`;
+  logger.info(`createAppCenterUpload: start post to: ${url} with apikey: ${options.appCenterAPIKey}`);
+
+}
+
+function uploadFileToDiawi (filename) {
+    logger.info('uploadFileToDiawi: start');
+
+    var readable = fs.createReadStream(filename);
+    readable.on('error', () => {
+        logger.error('Error reading binary file for upload to Diawi');
+    });
+
+    // Create FormData
+    var form = new FormData();
+    form.append('file', readable);
+    form.append('token', options.diawiAPIKey);
+    form.append('find_by_udid', "0");
+    form.append('wall_of_apps', "0");
+
+    //form.append('callback_emails', 0);
+    //form.append('password', password config);
+
+    var parsedUrl = url.parse(options.diawiHost);
+    logger.info(`uploadFileToDiawi: url ${url}`);
+
+    return new Promise((resolve, reject) => {
+        var req = form.submit({
+            host: parsedUrl.host,
+            path: parsedUrl.pathname + (parsedUrl.search ? parsedUrl.search : ''),
+            protocol: parsedUrl.protocol,
+            headers: {
+                'Accept': 'application/json'
+            }
+        }, function (err, res) {
+            if (err) {
+                logger.error('Error when uploading: %j', err);
+                reject(err);
+            }
+
+            if (res.statusCode !== 200 && res.statusCode !== 201 && res.statusCode !== 204) {
+                logger.info('Uploading failed with status ' + res.statusCode);
+                reject(err);
+            }
+
+            var jsonString = ''; // eslint-disable-line
+            res.on('data', (chunk) => {
+                jsonString += String.fromCharCode.apply(null, new Uint16Array(chunk));
+            });
+
+            res.on('end', () => {
+                logger.info('uploadFileToAppCenter: finished');
+
+                deleteFile(filename, resolve);
+            });
+        });
+
+        // Track upload progress.
+        var len = parseInt(req.getHeader('content-length'), 10);
+        var cur = 0;
+        var total = len / 1048576; // 1048576 - bytes in  1Megabyte
+
+        req.on('data', (chunk) => {
+            cur += chunk.length;
+            logger.debug('Downloading ' + (100.0 * cur / len).toFixed(2) + '%, Downloaded: ' + (cur / 1048576).toFixed(2) + ' mb, Total: ' + total.toFixed(2) + ' mb');
+        });
+    });
+}
+
+function checkDiawiUploadStatus (job) {
+    var url = `https://upload.diawi.com/status?token=${options.diawiAPIKey}&job=${job}`;
+    logger.info(`createAppCenterUpload: start post to: ${url} with apikey: ${options.appCenterAPIKey}`);
+
+    return new Promise((resolve, reject) =>
+        najax({
+            url: url,
+            method: 'GET',
+            headers: {
+                'X-API-Token': options.appCenterAPIKey,
+                'Content-Type': 'application/json'
+            },
+            success: function (data) {
+                var parsedData = JSON.parse(data);
+
+                logger.info('createAppCenterUpload: finished');
+                resolve({
+                    uploadId: parsedData.upload_id,
+                    uploadUrl: parsedData.upload_url
+                });
+            },
+            error: function (error) {
+                logger.error('Error when creating upload: %j', error);
+                reject(error);
+            }
+        })
+    );
+}
 function createAppCenterUpload (ownerName, appName) {
     logger.info('createAppCenterUpload: start');
     var url = `${options.appCenterHost}/v0.1/apps/${ownerName}/${appName}/release_uploads`;
